@@ -270,24 +270,64 @@ sprites_downright BYTE "   ", 0ah, " O ", 0ah, " \\", 0
 
 ; --------------------------    BALLS    -------------------------
 
-    ; Define the Ball structure with color
+    ; Update the ball structure definition
     BallStruct STRUCT
-        xPos      BYTE ?
-        yPos      BYTE ?
-        stepIndex DWORD ?
-        active    BYTE ?
-        color     BYTE ?
+        xPos      BYTE ?    ; X position
+        yPos      BYTE ?    ; Y position 
+        pathIndex DWORD ?   ; Current position in path
+        active    BYTE ?    ; Is ball active
+        color     BYTE ?    ; Ball color
     BallStruct ENDS
 
-    ;SIZEOF BallStruct EQU 8
     MAX_BALLS EQU 30
+     PATH_LENGTH EQU 140   ; Number of positions in the path
 
-    ; Array of 30 balls using the updated BallStruct
+; X coordinates array (move from right to left in a curve)
+path_x  db 102, 100, 98, 96, 94, 92, 90, 88, 86, 84    ; First 10 values
+        db 82,  80,  78, 76, 74, 72, 70, 68, 66, 64      ; Next 10 values
+        db 62,  60,  58, 56, 54, 52, 50, 48, 46, 44      ; Next 10 values
+        db 42,  40,  38, 36, 34, 32, 30, 28, 26, 24      ; Next 10 values
+        db 22,  20,  18, 16, 14, 12, 10,  8,  6,  6         ; Next 10 values
+        db  6,   6,   6,  6,  6,  6,  6,  6,  6,  7         ; next 10 values 
+        db  8,   9,  10, 11, 12, 14, 16, 18, 20, 22	 ; next 10 values
+        db 24,  26,  28, 30, 32, 34, 36, 38, 40, 42	 ; next 10 values
+        db 44, 46, 48, 50, 52, 54, 56, 58, 60, 62	 ; next 10 values
+        db 64, 66, 68, 70, 72, 74, 76, 78, 80, 82  ; next 10 values
+        db 84, 86, 88, 89, 90, 91, 92, 93, 94, 94  ; next 10 values
+        db 94, 94, 94, 94, 94, 94, 94, 92, 90, 88  ; next 10 values
+        db 86, 84, 82, 80, 78, 76, 74, 72, 70, 68  ; next 10 values
+        db 66, 64, 62, 60, 58, 56, 54, 52, 50, 48  ; next 10 values
+        db 46, 44, 42, 40, 38, 36, 34, 32, 30, 28  ; next 10 values
+
+; Y coordinates array (move down gradually)
+path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
+        db 3, 3, 3, 3, 3, 3, 3, 3, 3, 3                ; Next 10 values
+        db 3, 3, 3, 3, 3, 3, 3, 3, 3, 3                ; Next 10 values
+        db 3, 3, 3, 3, 3, 3, 3, 3, 3, 3                ; Next 10 values
+        db 3, 3, 3, 4, 5, 6, 7, 8, 9, 10               ; next 10 values 
+        db 11, 12, 13, 14, 15, 16, 17, 18, 19, 20       ; next 10 values
+        db 21, 22, 23 ,24, 25, 26, 26 ,26 ,26, 26		; next 10 values
+        db 26, 26, 26, 26 ,26 ,26, 26, 26, 26, 26		; next 10 values
+        db 26, 26, 26, 26 ,26 ,26, 26, 26, 26, 26		; next 10 values
+        db 26, 26, 26, 26 ,26 ,26, 26, 26, 26, 26		; next 10 values
+        db 26, 26, 25, 24, 23, 22, 21, 20, 19, 18		; next 10 values
+        db 17, 16, 15, 14, 13, 12, 11, 10, 9, 8		; next 10 values
+        db 7, 7, 7, 7, 7, 7, 7, 7, 7, 7			; next 10 values
+        db 7, 7, 7, 7, 7, 7, 7, 7, 7, 7			; next 10 values
+        db 7, 7, 7, 7, 7, 7, 7, 7, 7, 7			; next 10 values
+
+    ; Colors
+    DIM_COLOR    EQU 8   ; Gray color for static path
+    ACTIVE_COLOR EQU 10  ; Light Green for moving balls
+
+    
+
+    ; Time between ball spawns
+    SPAWN_DELAY EQU 50000
+    last_spawn_time DWORD 0
+
+        ; Array of 30 balls using the updated BallStruct
     balls BallStruct MAX_BALLS DUP (<>)
-
-    ; Movement steps
-    spiral_steps_x db 100, 100, 100, 100, 100, -1, 0, 1, 1, 1, 0, -1, -1, -1, 0, 1, 1, 1, 0, -1
-    spiral_steps_y db 5, 6, 7, 8, 9, -1, -1, -1, 0, 1, 1, 1, 0, -1, -1, -1, 0, 1, 1, 1
 
     ; Field offsets within BallStruct
     Ball_xPos     EQU 0
@@ -296,7 +336,26 @@ sprites_downright BYTE "   ", 0ah, " O ", 0ah, " \\", 0
     Ball_active   EQU 6
     Ball_color    EQU 7
 
-    
+    Comment @
+    ; Define the static path coordinates (x,y pairs)
+    ;PATH_LENGTH EQU 30   ; Number of positions in the path
+    path_coords BYTE 
+        ; X coordinates
+        100, 99, 98, 97, 96, 95, 94, 93, 92, 91,
+        90, 89, 88, 87, 86, 85, 84, 83, 82, 81,
+        80, 79, 78, 77, 76, 75, 74, 73, 72, 71,
+        ; Y coordinates
+        5, 5, 6, 6, 7, 7, 8, 8, 9, 9,
+        10, 10, 11, 11, 12, 12, 13, 13, 14, 14,
+        15, 15, 16, 16, 17, 17, 18, 18, 19, 19
+
+    ; Color for static path
+    DIM_COLOR EQU 8      ; Gray color
+    ACTIVE_COLOR EQU 10  ; Light Green for moving balls
+
+@
+
+
 .code
 
 
@@ -1233,33 +1292,69 @@ MovePlayer PROC
     ret
 MovePlayer ENDP
 
-; InitializeBalls Procedure
-; InitializeBalls Procedure
+
+; Draw the static path
+DrawStaticPath PROC
+    push eax
+    push ebx
+    push ecx
+    push edx
+
+    ; Set dim color for static path
+    mov eax, DIM_COLOR
+    call SetTextColor
+
+    ; Draw 'O' at each path coordinate
+    mov ecx, PATH_LENGTH
+    xor esi, esi        ; Path index
+
+draw_path_loop:
+    ; Get coordinates
+    mov dl, [path_x + esi]    ; X position
+    mov dh, [path_y + esi]    ; Y position
+    call Gotoxy
+    
+    ; Draw the 'O' character
+    mov al, 'O'
+    call WriteChar
+    
+    inc esi
+    loop draw_path_loop
+
+    pop edx
+    pop ecx
+    pop ebx
+    pop eax
+    ret
+DrawStaticPath ENDP
+
+; InitializeBalls Procedure 
 InitializeBalls PROC
-    mov ecx, MAX_BALLS    ; Set loop counter to MAX_BALLS
-    xor esi, esi          ; Initialize index to 0
+    mov ecx, MAX_BALLS
+    xor esi, esi        ; Ball index
 
-InitializeLoop:
-    ; Initialize X position to top-right (e.g., 100)
-    mov BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_xPos], 100
-
-    ; Initialize Y position to top (e.g., 5)
-    mov BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_yPos], 5
-
-    ; Initialize stepIndex to 0
-    mov DWORD PTR [balls + esi*SIZEOF BallStruct + Ball_stepIdx], 0
-
-    ; Set active flag to 1
-    mov BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_active], 1
-
-    ; Initialize color (Light Green = 10)
-    mov BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_color], 10
-
-    call DrawBall        ; Draw the ball immediately
-
-    inc esi              ; Move to the next ball
-    loop InitializeLoop  ; Repeat until all balls are initialized
-
+init_loop:
+    ; Set initial position (100,1)
+    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], 100
+    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], 1
+    
+    ; Start inactive except first ball
+    mov BYTE PTR [balls + esi*8 + BallStruct.active], 0
+    
+    ; Set pathIndex to 0
+    mov DWORD PTR [balls + esi*8 + BallStruct.pathIndex], 0
+    
+    ; Set color (Light Green = 10)
+    mov BYTE PTR [balls + esi*8 + BallStruct.color], 10
+    
+    inc esi
+    loop init_loop
+    
+    ; Activate and draw first ball
+    mov BYTE PTR [balls + 0 + BallStruct.active], 1
+    xor esi, esi    ; Set ESI to 0 for first ball
+    call DrawBall   ; Draw the first ball
+    
     ret
 InitializeBalls ENDP
 
@@ -1267,26 +1362,23 @@ InitializeBalls ENDP
 DrawBall PROC
     push eax
     push ebx
+    push edx
 
-    ; ESI contains the current ball's index
-
-    ; Retrieve color
-    mov al, BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_color]
-    ; Set text color
+    ; Retrieve color and set it
+    mov al, BYTE PTR [balls + esi*8 + BallStruct.color]
     movzx eax, al
-    call SetTextColor       ; Uses EAX for color
+    call SetTextColor
 
-    ; Retrieve X and Y positions
-    mov bl, BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_xPos]    ; Get X position
-    mov bh, BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_yPos]    ; Get Y position
+    ; Get position and move cursor there
+    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]    ; X position to dl
+    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]    ; Y position to dh
+    call Gotoxy
 
-    ; Set cursor position using Irvine32's Gotoxy
-    call Gotoxy            ; Assumes Gotoxy uses BL and BH for X and Y
-
-    ; Print 'O'
+    ; Draw the ball
     mov al, 'O'
     call WriteChar
 
+    pop edx
     pop ebx
     pop eax
     ret
@@ -1296,102 +1388,174 @@ DrawBall ENDP
 EraseBall PROC
     push eax
     push ebx
+    push edx
 
-    ; ESI contains the current ball's index
-
-    ; Set color to white before erasing
-    mov al, 7
-    movzx eax, al
+    ; Set color to white
+    mov eax, 7
     call SetTextColor
 
-    ; Retrieve X and Y positions
-    mov bl, BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_xPos]    ; Get X position
-    mov bh, BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_yPos]    ; Get Y position
+    ; Get position and move cursor there
+    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]    ; X position to dl
+    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]    ; Y position to dh
+    call Gotoxy
 
-    ; Set cursor position using Irvine32's Gotoxy
-    call Gotoxy            ; Assumes Gotoxy uses BL and BH for X and Y
-
-    ; Print space to erase
+    ; Erase by printing space
     mov al, ' '
     call WriteChar
 
+    pop edx
     pop ebx
     pop eax
     ret
 EraseBall ENDP
 
 ; UpdateBalls Procedure
-UpdateBalls PROC
-    mov ecx, MAX_BALLS    ; Set loop counter to MAX_BALLS
-    xor esi, esi          ; Initialize index to 0
+UpdateBalls PROC USES eax ebx ecx edx esi
+    ; Static spawn timer
+    mov eax, [last_spawn_time]
+    inc eax
+    mov [last_spawn_time], eax
+    
+    ; Spawn check - every 50 updates
+    cmp eax, 50
+    jge do_spawn          
+    jmp update_active_balls
+    
+do_spawn:
+    ; Reset timer and spawn new ball
+    mov [last_spawn_time], 0
+    call SpawnNewBall
+    
+update_active_balls:
+    mov ecx, MAX_BALLS
+    xor esi, esi        ; Ball index
 
-UpdateLoop:
-    ; Check if the current ball is active
-    mov al, BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_active]
-    cmp al, 1
-    jne NextBall           ; Skip if inactive
+update_loop:
+    ; Check if ball is active
+    cmp BYTE PTR [balls + esi*8 + BallStruct.active], 1
+    jne short_jump_next    
 
-    ; Retrieve current step index
-    mov eax, DWORD PTR [balls + esi*SIZEOF BallStruct + Ball_stepIdx]
-    cmp eax, 20            ; Assuming 20 steps for the spiral
-    jae DeactivateBall     ; Deactivate if stepIndex >= 20
+    ; Get current path index
+    mov eax, DWORD PTR [balls + esi*8 + BallStruct.pathIndex]
+    
+    ; Check if reached end of path
+    cmp eax, PATH_LENGTH
+    jge short_jump_deactivate
+    
+    ; Update position from path arrays
+    mov bl, [path_x + eax]    ; Get X coordinate
+    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], bl
+    
+    mov bl, [path_y + eax]    ; Get Y coordinate
+    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], bl
+    
+    ; Set active color and update the position
+    mov eax, ACTIVE_COLOR
+    call SetTextColor
+    
+    ; Move cursor and draw ball
+    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
+    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
+    call Gotoxy
+    
+    mov al, 'O'
+    call WriteChar
+    
+    ; Increment path index
+    inc DWORD PTR [balls + esi*8 + BallStruct.pathIndex]
+    
+    ; Add delay for visible movement
+    mov eax, 5000    
+    call Delay
+    
+    jmp short_jump_next
 
-    ; Erase the ball from its current position
-    call EraseBall
+short_jump_deactivate:
+    jmp deactivate_ball
 
-    ; Get movement offsets from spiral_steps arrays
-    mov bl, BYTE PTR [spiral_steps_x + eax]
-    add BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_xPos], bl
-
-    mov bl, BYTE PTR [spiral_steps_y + eax]
-    add BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_yPos], bl
-
-    ; Draw the ball at the new position
-    call DrawBall
-
-    ; Increment step index
-    inc DWORD PTR [balls + esi*SIZEOF BallStruct + Ball_stepIdx]
-
-    ; Check if the ball has completed its path
-    cmp DWORD PTR [balls + esi*SIZEOF BallStruct + Ball_stepIdx], 20
-    jb ContinueBall
-DeactivateBall:
-    ; Deactivate the ball
-    mov BYTE PTR [balls + esi*SIZEOF BallStruct + Ball_active], 0
-ContinueBall:
-
-NextBall:
-    inc esi                ; Move to the next ball
-    loop UpdateLoop         ; Repeat for all balls
-
+short_jump_next:
+    jmp next_ball
+    
+deactivate_ball:
+    mov BYTE PTR [balls + esi*8 + BallStruct.active], 0
+    
+    ; Reset color to dim when ball deactivates
+    mov eax, DIM_COLOR
+    call SetTextColor
+    
+    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
+    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
+    call Gotoxy
+    
+    mov al, 'O'
+    call WriteChar
+    
+next_ball:
+    inc esi
+    dec ecx                 ; Decrement counter
+    jnz update_loop        ; Jump if not zero (replace loop instruction)
+    
     ret
 UpdateBalls ENDP
+
+; Helper procedure to spawn new balls
+SpawnNewBall PROC
+    push ecx
+    push esi
+    
+    ; Find inactive ball
+    mov ecx, MAX_BALLS
+    xor esi, esi
+    
+find_inactive:
+    cmp BYTE PTR [balls + esi*8 + BallStruct.active], 0
+    je spawn_this_ball
+    inc esi
+    loop find_inactive
+    jmp done_spawn    ; No inactive balls found
+    
+spawn_this_ball:
+    mov BYTE PTR [balls + esi*8 + BallStruct.active], 1
+    mov DWORD PTR [balls + esi*8 + BallStruct.pathIndex], 0
+    
+    ; Set initial position
+    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], 100
+    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], 1
+    
+    ; Draw the new ball
+    call DrawBall
+    
+done_spawn:
+    pop esi
+    pop ecx
+    ret
+SpawnNewBall ENDP
 
 ; GameLoop Procedure
 GameLoop PROC
     loop1:
+        ; Update moving balls first
+        call UpdateBalls
+
         ; Handle player input and movements
         call MovePlayer
 
-        ; Update moving balls
-        call UpdateBalls
-
-        ; Collision detection and other game logic
-        ; call CollisionCheck   ; Implement as needed
-
-        ; Control game speed
-        mov eax, 100000         ; Adjust the delay value for desired speed
+        ; Control game speed - shorter delay for smoother animation
+        mov eax, 50000         ; Adjusted delay value
         call Delay
 
-        jmp loop1               ; Repeat the loop
+        jmp loop1             ; Repeat the loop
 
     ret
 GameLoop ENDP
 
-; Initialize Screen Procedure
+; Modified InitialiseScreen to include static path
 InitialiseScreen PROC
-    ; Draw the level layout at the start
+    ; Draw the level layout
     call DrawWall
+
+    ; Draw the static path first
+    call DrawStaticPath
 
     ; Initialize ball positions
     call InitializeBalls
@@ -1405,17 +1569,15 @@ InitialiseScreen PROC
     call DisplayTips
     call DisplayStats
     call DisplayArt
-    ;call DisplayObjective
-    ;call DisplayProgress
-    ;call DisplayEnemies
-    ;call DisplayMiniMap
     call DisplayPlayerName
 
     ret
 InitialiseScreen ENDP
-
 ; Main Procedure
 main PROC
+
+comment @
+
     call DrawMenu
     call askforChoice
 
@@ -1438,6 +1600,8 @@ showhighscores:
 instructions:
     call displayInstructions
     ret
+
+    @
 
 startgame:
     call InitialiseScreen 
