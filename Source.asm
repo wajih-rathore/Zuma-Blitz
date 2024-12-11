@@ -1411,30 +1411,90 @@ DrawBall PROC
     ret
 DrawBall ENDP
 
+
+
+IsPathPosition PROC
+    ; Inputs:
+    ;   dl - current x position
+    ;   dh - current y position
+    ; Output:
+    ;   al - 1 if on path, 0 otherwise
+
+    push    esi
+    push    edi
+    push    ecx
+
+    mov     esi, OFFSET path_x
+    mov     edi, OFFSET path_y
+    mov     ecx, PATH_LENGTH
+
+    xor     al, al          ; Default to not on path
+
+CheckLoop:
+    cmp     dl, [esi]
+    jne     NotMatch
+    cmp     dh, [edi]
+    jne     NotMatch
+    mov     al, 1           ; Found a match
+    jmp     DoneCheck
+
+NotMatch:
+    inc     esi
+    inc     edi
+    dec     ecx
+    jnz     CheckLoop
+
+DoneCheck:
+    pop     ecx
+    pop     edi
+    pop     esi
+    ret
+IsPathPosition ENDP
+
+
+
 ; EraseBall Procedure
 EraseBall PROC
-    push eax
-    push ebx
-    push edx
+    ; Preserve all registers that might be altered
+    push    eax
+    push    ebx
+    push    ecx
+    push    edx
+    push    esi
+    push    edi
 
-    ; Set color to white
-    mov eax, 7
-    call SetTextColor
+    ; Get current fireball position
+    mov     dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
+    mov     dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
 
-    ; Get position and move cursor there
-    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]    ; X position to dl
-    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]    ; Y position to dh
-    call Gotoxy
+    ; Check if the current position is on the path
+    call    IsPathPosition
+    cmp     al, 1
+    jne     NotOnPath
 
-    ; Erase by printing space
-    mov al, ' '
-    call WriteChar
+    ; If on path, redraw the path character 'O'
+    mov     al, 'O'
+    mov     ah, DIM_COLOR   ; Set path color
+    call    WriteChar
+    jmp     EndErase
 
-    pop edx
-    pop ebx
-    pop eax
+NotOnPath:
+    ; If not on path, erase by writing a space
+    mov     al, ' '
+    mov     ah, 7           ; Default color (white)
+    call    WriteChar
+
+EndErase:
+    ; Restore preserved registers
+    pop     edi
+    pop     esi
+    pop     edx
+    pop     ecx
+    pop     ebx
+    pop     eax
     ret
 EraseBall ENDP
+
 
 ; UpdateBalls Procedure
 
@@ -1574,8 +1634,8 @@ GameLoop PROC
         call MovePlayer
 
         ; Control game speed - shorter delay for smoother animation
-        mov eax, 50000         ; Adjusted delay value
-        call Delay
+        ;mov eax, 50000         ; Adjusted delay value
+        ;call Delay
 
         jmp loop1             ; Repeat the loop
 
