@@ -334,14 +334,12 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
         db 14, 14, 14, 14, 14, 14, 14, 14, 14, 14		; next 10 values
         	
 
+
     ; Colors
     DIM_COLOR    EQU 8   ; Gray color for static path
     ACTIVE_COLOR EQU 10  ; Light Green for moving balls
 
-        ; Define colors for balls (30 colors for 30 balls)
-    ball_colors BYTE 9, 10, 11, 12, 13, 14, 1, 2, 3, 4   ; First 10 balls (different colors)
-                BYTE 9, 10, 11, 12, 13, 14, 1, 2, 3, 4    ; Next 10 balls
-                BYTE 9, 10, 11, 12, 13, 14, 1, 2, 3, 4     ; Last 10 balls
+    
 
     ; Time between ball spawns
     SPAWN_DELAY EQU 50000
@@ -358,17 +356,6 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
     Ball_color    EQU 7
 
     Comment @
-    ; Define the static path coordinates (x,y pairs)
-    ;PATH_LENGTH EQU 30   ; Number of positions in the path
-    path_coords BYTE 
-        ; X coordinates
-        100, 99, 98, 97, 96, 95, 94, 93, 92, 91,
-        90, 89, 88, 87, 86, 85, 84, 83, 82, 81,
-        80, 79, 78, 77, 76, 75, 74, 73, 72, 71,
-        ; Y coordinates
-        5, 5, 6, 6, 7, 7, 8, 8, 9, 9,
-        10, 10, 11, 11, 12, 12, 13, 13, 14, 14,
-        15, 15, 16, 16, 17, 17, 18, 18, 19, 19
 
     ; Color for static path
     DIM_COLOR EQU 8      ; Gray color
@@ -935,10 +922,8 @@ FireBall ENDP
 
 ; Display game controls on the right side
 DisplayControls PROC
-
-    
     mov dl, 105     ; Start column on the right
-    mov dh, 6       ; Starting row position
+    mov dh, 5       ; Starting row position
     call Gotoxy
 
     mWrite "Controls:"
@@ -963,7 +948,7 @@ DisplayControls ENDP
 ; Display high score
 DisplayHighScore PROC
     mov dl, 105
-    mov dh, 14
+    mov dh, 12
     call Gotoxy
 
     mWrite "High Score:"
@@ -978,7 +963,7 @@ DisplayHighScore ENDP
 ; Display gameplay tips
 DisplayTips PROC
     mov dl, 105
-    mov dh, 17
+    mov dh, 15
     call Gotoxy
 
     mWrite "Tip:"
@@ -994,7 +979,7 @@ DisplayTips ENDP
 ; Display combo count
 DisplayStats PROC
     mov dl, 105
-    mov dh, 21
+    mov dh, 19
     call Gotoxy
 
     mWrite "Combo Count:"
@@ -1008,7 +993,7 @@ DisplayStats ENDP
 
 DisplayArt PROC
     mov dl, 105
-    mov dh, 25
+    mov dh, 22
     call Gotoxy
 
     mWrite " /\_/\ "
@@ -1317,7 +1302,6 @@ MovePlayer ENDP
 
 
 ; Draw the static path
-; Draw the static path first
 DrawStaticPath PROC
     push eax
     push ebx
@@ -1352,38 +1336,35 @@ draw_path_loop:
     ret
 DrawStaticPath ENDP
 
-
-
 ; InitializeBalls Procedure 
 InitializeBalls PROC
     mov ecx, MAX_BALLS
     xor esi, esi        ; Ball index
 
 init_loop:
-    ; Set initial position off-screen for inactive balls
-    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], 0
-    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], 0
-
+    ; Set initial position (100,1)
+    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], 100
+    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], 1
+    
     ; Start inactive except first ball
     mov BYTE PTR [balls + esi*8 + BallStruct.active], 0
-
+    
     ; Set pathIndex to 0
     mov DWORD PTR [balls + esi*8 + BallStruct.pathIndex], 0
-
+    
     ; Set color (Light Green = 10)
     mov BYTE PTR [balls + esi*8 + BallStruct.color], 10
-
+    
     inc esi
     loop init_loop
-
+    
     ; Activate and draw first ball
     mov BYTE PTR [balls + 0 + BallStruct.active], 1
-    xor esi, esi    ; Set ESI to 0
+    xor esi, esi    ; Set ESI to 0 for first ball
     call DrawBall   ; Draw the first ball
-
+    
     ret
 InitializeBalls ENDP
-
 
 ; DrawBall Procedure
 DrawBall PROC
@@ -1497,23 +1478,22 @@ EraseBall ENDP
 
 
 ; UpdateBalls Procedure
-
 UpdateBalls PROC USES eax ebx ecx edx esi
     ; Static spawn timer
     mov eax, [last_spawn_time]
     inc eax
     mov [last_spawn_time], eax
-
+    
     ; Spawn check - every 50 updates
     cmp eax, 50
     jge do_spawn          
     jmp update_active_balls
-
+    
 do_spawn:
     ; Reset timer and spawn new ball
     mov [last_spawn_time], 0
     call SpawnNewBall
-
+    
 update_active_balls:
     mov ecx, MAX_BALLS
     xor esi, esi        ; Ball index
@@ -1525,41 +1505,37 @@ update_loop:
 
     ; Get current path index
     mov eax, DWORD PTR [balls + esi*8 + BallStruct.pathIndex]
-
+    
     ; Check if reached end of path
     cmp eax, PATH_LENGTH
     jge short_jump_deactivate
-
-    ; **Erase previous 'O'**
-    mov esi, esi        ; Ensure ESI is correctly set
-    call EraseBall
-
-    ; Get new coordinates from path
-    movzx edx, BYTE PTR [path_x + eax]    ; X coordinate
-    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], dl
-
-    movzx edx, BYTE PTR [path_y + eax]    ; Y coordinate
-    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], dl
-
-    ; Set color from ball_colors array
-    movzx eax, BYTE PTR [ball_colors + esi]    ; Get color for this ball
+    
+    ; Update position from path arrays
+    mov bl, [path_x + eax]    ; Get X coordinate
+    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], bl
+    
+    mov bl, [path_y + eax]    ; Get Y coordinate
+    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], bl
+    
+    ; Set active color and update the position
+    mov eax, ACTIVE_COLOR
     call SetTextColor
-
-    ; Draw the 'O' at new position
+    
+    ; Move cursor and draw ball
     mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
     mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
     call Gotoxy
-
+    
     mov al, 'O'
     call WriteChar
-
+    
     ; Increment path index
     inc DWORD PTR [balls + esi*8 + BallStruct.pathIndex]
-
+    
     ; Add delay for visible movement
     mov eax, 5000    
     call Delay
-
+    
     jmp short_jump_next
 
 short_jump_deactivate:
@@ -1567,21 +1543,28 @@ short_jump_deactivate:
 
 short_jump_next:
     jmp next_ball
-
+    
 deactivate_ball:
     mov BYTE PTR [balls + esi*8 + BallStruct.active], 0
-
-    ; **Erase the 'O' by calling EraseBall**
-    call EraseBall
-
+    
+    ; Reset color to dim when ball deactivates
+    mov eax, DIM_COLOR
+    call SetTextColor
+    
+    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
+    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
+    call Gotoxy
+    
+    mov al, 'O'
+    call WriteChar
+    
 next_ball:
     inc esi
     dec ecx                 ; Decrement counter
-    jnz update_loop        ; Jump if not zero
-
+    jnz update_loop        ; Jump if not zero (replace loop instruction)
+    
     ret
 UpdateBalls ENDP
-
 
 ; Helper procedure to spawn new balls
 SpawnNewBall PROC
@@ -1607,16 +1590,8 @@ spawn_this_ball:
     mov BYTE PTR [balls + esi*8 + BallStruct.xPos], 100
     mov BYTE PTR [balls + esi*8 + BallStruct.yPos], 1
     
-    ; Draw the new ball with its color
-    movzx eax, BYTE PTR [ball_colors + esi]    ; Get color for this ball
-    call SetTextColor
-    
-    mov dl, 100
-    mov dh, 1
-    call Gotoxy
-    
-    mov al, 'O'
-    call WriteChar
+    ; Draw the new ball
+    call DrawBall
     
 done_spawn:
     pop esi
