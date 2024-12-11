@@ -280,7 +280,8 @@ sprites_downright BYTE "   ", 0ah, " O ", 0ah, " \\", 0
     BallStruct ENDS
 
     MAX_BALLS EQU 30
-     PATH_LENGTH EQU 140   ; Number of positions in the path
+
+     PATH_LENGTH EQU 225  ; Number of positions in the path
 
 ; X coordinates array (move from right to left in a curve)
 path_x  db 102, 100, 98, 96, 94, 92, 90, 88, 86, 84    ; First 10 values
@@ -298,6 +299,14 @@ path_x  db 102, 100, 98, 96, 94, 92, 90, 88, 86, 84    ; First 10 values
         db 86, 84, 82, 80, 78, 76, 74, 72, 70, 68  ; next 10 values
         db 66, 64, 62, 60, 58, 56, 54, 52, 50, 48  ; next 10 values
         db 46, 44, 42, 40, 38, 36, 34, 32, 30, 28  ; next 10 values
+        db 26, 24, 22, 20, 18, 16, 16, 16, 16, 16   ; next 10 values
+        db 16, 16, 16, 16, 16, 17, 18, 19, 20, 22  ; next 10 values
+        db 24, 26, 28, 30, 32, 34, 36, 38, 40, 42  ; next 10 values
+        db 44, 46, 48, 50, 52, 54, 56, 58, 60, 62  ; next 10 values
+        db 64, 66, 68, 70, 72, 74, 76, 78, 80, 81  ; next 10 values
+        db 82, 83, 84, 85, 85, 85, 85, 85, 85, 85  ; next 10 values
+        db 83, 81, 79, 77, 75, 73, 71, 69, 67, 65  ; next 10 values
+        db 63, 61, 59, 57, 55, 53, 51, 49, 47, 45  ; next 10 values
 
 ; Y coordinates array (move down gradually)
 path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
@@ -315,6 +324,16 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
         db 7, 7, 7, 7, 7, 7, 7, 7, 7, 7			; next 10 values
         db 7, 7, 7, 7, 7, 7, 7, 7, 7, 7			; next 10 values
         db 7, 7, 7, 7, 7, 7, 7, 7, 7, 7			; next 10 values
+        db 7, 7, 8, 9, 10, 11, 12, 13, 14, 15		; next 10 values
+        db 14, 15, 16, 17, 18, 19, 20, 21, 22, 22		; next 10 values
+        db 22, 22, 22, 22, 22, 22, 22, 22, 22, 22		; next 10 values
+        db 22, 22, 22, 22, 22, 22, 22, 22, 22, 22		; next 10 values
+        db 22, 22, 22, 22, 22, 22, 22, 22, 22, 21		; next 10 values
+        db 20, 19, 18, 17, 16, 15, 14, 14, 14, 14		; next 10 values
+        db 14, 14, 14, 14, 14, 14, 14, 14, 14, 14		; next 10 values
+        db 14, 14, 14, 14, 14, 14, 14, 14, 14, 14		; next 10 values
+        	
+
 
     ; Colors
     DIM_COLOR    EQU 8   ; Gray color for static path
@@ -337,17 +356,6 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
     Ball_color    EQU 7
 
     Comment @
-    ; Define the static path coordinates (x,y pairs)
-    ;PATH_LENGTH EQU 30   ; Number of positions in the path
-    path_coords BYTE 
-        ; X coordinates
-        100, 99, 98, 97, 96, 95, 94, 93, 92, 91,
-        90, 89, 88, 87, 86, 85, 84, 83, 82, 81,
-        80, 79, 78, 77, 76, 75, 74, 73, 72, 71,
-        ; Y coordinates
-        5, 5, 6, 6, 7, 7, 8, 8, 9, 9,
-        10, 10, 11, 11, 12, 12, 13, 13, 14, 14,
-        15, 15, 16, 16, 17, 17, 18, 18, 19, 19
 
     ; Color for static path
     DIM_COLOR EQU 8      ; Gray color
