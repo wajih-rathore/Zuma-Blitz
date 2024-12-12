@@ -1250,68 +1250,97 @@ ret
 PrintPlayer ENDP
 
 MovePlayer PROC
-    mov dx, 0
-    call GoToXY
-
-    checkInput:
-
-    mov eax, 5
-    call Delay
+    push    eax
+    push    ebx
+    push    ecx
+    push    edx
 
     ; Check for key press
-    mov eax, 0
-    call ReadKey
-    mov inputChar, al
+    call    ReadKey          ; Non-blocking key read
+    mov     inputChar, al
 
-    cmp inputChar, VK_SPACE
-    je shoot
+    ; Handle input
+    cmp     inputChar, VK_SPACE
+    je      shoot
+    cmp     inputChar, VK_ESCAPE
+    je      paused
+    cmp     inputChar, 'w'
+    je      move_up
+    cmp     inputChar, 'a'
+    je      move_left
+    cmp     inputChar, 'x'
+    je      move_down
+    cmp     inputChar, 'd'
+    je      move_right
+    cmp     inputChar, 'q'
+    je      rotate_left
+    cmp     inputChar, 'e'
+    je      rotate_right
+    cmp     inputChar, 'z'
+    je      rotate_down_left
+    cmp     inputChar, 'c'
+    je      rotate_down_right
+    jmp     no_action        ; No valid input
 
-    cmp inputChar, VK_ESCAPE
-    je paused
+move_up:
+    ; Implement move up logic
+    ; ...
+    jmp     end_move
 
-    cmp inputChar, "w"
-    je move
+move_left:
+    ; Implement move left logic
+    ; ...
+    jmp     end_move
 
-    cmp inputChar, "a"
-    je move
+move_down:
+    ; Implement move down logic
+    ; ...
+    jmp     end_move
 
-    cmp inputChar, "x"
-    je move
+move_right:
+    ; Implement move right logic
+    ; ...
+    jmp     end_move
 
-    cmp inputChar, "d"
-    je move
+rotate_left:
+    ; Implement rotate left logic
+    ; ...
+    jmp     end_move
 
-    cmp inputChar, "q"
-    je move
+rotate_right:
+    ; Implement rotate right logic
+    ; ...
+    jmp     end_move
 
-    cmp inputChar, "e"
-    je move
+rotate_down_left:
+    ; Implement rotate down-left logic
+    ; ...
+    jmp     end_move
 
-    cmp inputChar, "z"
-    je move
+rotate_down_right:
+    ; Implement rotate down-right logic
+    ; ...
+    jmp     end_move
 
-    cmp inputChar, "c"
-    je move
+shoot:
+    call    FireBall
+    jmp     end_move
 
-    ; if character is invalid, check for a new keypress
-    jmp checkInput
+paused:
+    ; Implement pause functionality
+    ; ...
+    jmp     end_move
 
-    move:
-        mov al, inputChar
-        mov direction, al
-        jmp chosen
+no_action:
+    ; No valid input was pressed
+    ; Continue without action
+    jmp     end_move
 
-    paused:
-        ; call your pause menu here... once you make it. for now, this will exit the game.
-        ret
-        
-    shoot:
-        call FireBall
-
-    chosen:
-        call PrintPlayer
-        call MovePlayer
-
+end_move:
+    pop     edx
+    pop     ecx
+    pop     ebx
+    pop     eax
     ret
 MovePlayer ENDP
 
@@ -1490,53 +1519,65 @@ EraseBall ENDP
 
 ; UpdateBalls Procedure
 UpdateBalls PROC
-    mov ecx, MAX_BALLS
-    xor esi, esi        ; Ball index
-update_loop:
-    mov eax, 200          ; Increased value for longer delay
-    call Delay
-    ; Check if ball is active
-    cmp BYTE PTR [balls + esi*8 + BallStruct.active], 1
-    jne next_ball
-    ; Erase the previous position
-    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
-    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
-    call Gotoxy
-    mov al, ' '
-    call WriteChar
-    ; Update position from path arrays
-    mov eax, DWORD PTR [balls + esi*8 + BallStruct.pathIndex]
-    cmp eax, PATH_LENGTH
-    jge deactivate_ball
-    ; Get new position
-    mov bl, [path_x + eax]
-    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], bl
-    mov bl, [path_y + eax]
-    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], bl
-    ; Set color for the ball
-    mov al, [ball_color + esi]
-    movzx eax, al
-    call SetTextColor
-    ; Draw the ball
-    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
-    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
-    call Gotoxy
-    mov al, 'O'
-    call WriteChar
-    ; Increment pathIndex
-    inc DWORD PTR [balls + esi*8 + BallStruct.pathIndex]
-    jmp next_ball
-deactivate_ball:
-    mov BYTE PTR [balls + esi*8 + BallStruct.active], 0
-next_ball:
-    inc esi
-    dec ecx
-    jnz update_loop
-    ; Add delay for movement speed control
+    push    eax
+    push    ebx
+    push    ecx
+    push    edx
+    push    esi
 
+    mov     ecx, MAX_BALLS
+    xor     esi, esi            ; Ball index = 0
+
+update_loop:
+    ; Check if the current ball is active
+    mov     al, [ball_active + esi]
+    cmp     al, 1
+    jne     next_ball           ; Skip inactive balls
+
+    ; Erase previous position
+    push    esi
+    call    EraseBall
+    pop     esi
+
+    ; Update pathIndex and positions
+    mov     eax, [ball_pathIndex + esi*4]
+    inc     eax
+    cmp     eax, PATH_LENGTH
+    jge     deactivate_ball
+    mov     [ball_pathIndex + esi*4], eax
+
+    mov     bl, [path_x + eax]
+    mov     [ball_x + esi], bl
+    mov     bl, [path_y + eax]
+    mov     [ball_y + esi], bl
+
+    ; Draw the ball with color from 'ball_colors'
+    push    esi
+    call    DrawBall
+    pop     esi
+
+    jmp     continue_update
+
+deactivate_ball:
+    mov     [ball_active + esi], 0
+
+continue_update:
+    inc     esi
+    loop    update_loop
+    jmp     end_update
+
+next_ball:
+    inc     esi
+    loop    update_loop
+
+end_update:
+    pop     esi
+    pop     edx
+    pop     ecx
+    pop     ebx
+    pop     eax
     ret
 UpdateBalls ENDP
-
 
 ; Helper procedure to spawn new balls
 SpawnNewBall PROC
@@ -1574,11 +1615,27 @@ SpawnNewBall ENDP
 ; GameLoop Procedure
 GameLoop PROC
 game_loop_start:
-    ; Update moving balls
-call UpdateBalls
     ; Handle player input and movements
     call MovePlayer
-    jmp game_loop_start
+
+    ; Update moving balls
+    call UpdateBalls
+
+    ; Optionally spawn new balls
+    call CheckAndSpawnBalls
+
+    ; Update game state
+    call UpdateGameState
+
+    ; Render frame (if applicable)
+    call RenderFrame
+
+    ; Introduce a short delay to control game speed
+    mov     eax, GAME_SPEED_DELAY
+    call    Delay
+
+    ; Repeat the loop
+    jmp     game_loop_start
 GameLoop ENDP
 
 ; Modified InitialiseScreen to include static path
