@@ -144,11 +144,14 @@ PlaySound proto, pszsound:ptr byte, hmod:dword, fdwsound:dword
           BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
+          BYTE "|                                                                                                      |", 0
           BYTE "|                                              ---                                                     |", 0
           BYTE "|                                             |   |                                                    |", 0
           BYTE "|                                             |   |                                                    |", 0
           BYTE "|                                             |   |                                                    |", 0
           BYTE "|                                              ---                                                     |", 0
+          BYTE "|                                                                                                      |", 0
+          BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
@@ -279,9 +282,11 @@ sprites_downright BYTE "   ", 0ah, " O ", 0ah, " \\", 0
         color     BYTE ?    ; Ball color
     BallStruct ENDS
 
-    MAX_BALLS EQU 30
+    
 
      PATH_LENGTH EQU 225  ; Number of positions in the path
+
+     MAX_BALLS EQU Path_length
 
 ; X coordinates array (move from right to left in a curve)
 path_x  db 102, 100, 98, 96, 94, 92, 90, 88, 86, 84    ; First 10 values
@@ -339,7 +344,7 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
     DIM_COLOR    EQU 8   ; Gray color for static path
     ACTIVE_COLOR EQU 10  ; Light Green for moving balls
 
-    
+    ball_color db 245 dup(10)
 
     ; Time between ball spawns
     SPAWN_DELAY EQU 50000
@@ -353,7 +358,7 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
     Ball_yPos     EQU 1
     Ball_stepIdx  EQU 2
     Ball_active   EQU 6
-    Ball_color    EQU 7
+    ;Ball_color    EQU 7
 
     Comment @
 
@@ -901,7 +906,7 @@ fire_loop:
     call WriteChar
 
     ; Delay for animation effect
-    mov eax, 50
+    mov eax, 10
     call Delay
 
     ; Erase the fire symbol before moving to the next position
@@ -1340,31 +1345,27 @@ DrawStaticPath ENDP
 InitializeBalls PROC
     mov ecx, MAX_BALLS
     xor esi, esi        ; Ball index
-
 init_loop:
-    ; Set initial position (100,1)
-    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], 100
-    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], 1
-    
-    ; Start inactive except first ball
-    mov BYTE PTR [balls + esi*8 + BallStruct.active], 0
-    
-    ; Set pathIndex to 0
-    mov DWORD PTR [balls + esi*8 + BallStruct.pathIndex], 0
-    
-    ; Set color (Light Green = 10)
-    mov BYTE PTR [balls + esi*8 + BallStruct.color], 10
-    
+    ; Initialize pathIndex for each ball
+    mov DWORD PTR [balls + esi*8 + BallStruct.pathIndex], esi
+    ; Activate all balls
+    mov BYTE PTR [balls + esi*8 + BallStruct.active], 1
+    ; Set the color for each ball (use a pattern or randomize)
+    ; For simplicity, alternate colors between 12 and 14
+    mov eax, esi
+    and al, 1
+    cmp al, 0
+    jne set_color_14
+    mov BYTE PTR [ball_color + esi], 12   ; Light Red
+    jmp next_init
+set_color_14:
+    mov BYTE PTR [ball_color + esi], 14   ; Yellow
+next_init:
     inc esi
     loop init_loop
-    
-    ; Activate and draw first ball
-    mov BYTE PTR [balls + 0 + BallStruct.active], 1
-    xor esi, esi    ; Set ESI to 0 for first ball
-    call DrawBall   ; Draw the first ball
-    
     ret
 InitializeBalls ENDP
+
 
 ; DrawBall Procedure
 DrawBall PROC
@@ -1478,93 +1479,53 @@ EraseBall ENDP
 
 
 ; UpdateBalls Procedure
-UpdateBalls PROC USES eax ebx ecx edx esi
-    ; Static spawn timer
-    mov eax, [last_spawn_time]
-    inc eax
-    mov [last_spawn_time], eax
-    
-    ; Spawn check - every 50 updates
-    cmp eax, 50
-    jge do_spawn          
-    jmp update_active_balls
-    
-do_spawn:
-    ; Reset timer and spawn new ball
-    mov [last_spawn_time], 0
-    call SpawnNewBall
-    
-update_active_balls:
+UpdateBalls PROC
     mov ecx, MAX_BALLS
     xor esi, esi        ; Ball index
-
 update_loop:
     ; Check if ball is active
     cmp BYTE PTR [balls + esi*8 + BallStruct.active], 1
-    jne short_jump_next    
-
-    ; Get current path index
-    mov eax, DWORD PTR [balls + esi*8 + BallStruct.pathIndex]
-    
-    ; Check if reached end of path
-    cmp eax, PATH_LENGTH
-    jge short_jump_deactivate
-    
-    ; Update position from path arrays
-    mov bl, [path_x + eax]    ; Get X coordinate
-    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], bl
-    
-    mov bl, [path_y + eax]    ; Get Y coordinate
-    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], bl
-    
-    ; Set active color and update the position
-    mov eax, ACTIVE_COLOR
-    call SetTextColor
-    
-    ; Move cursor and draw ball
+    jne next_ball
+    ; Erase the previous position
     mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
     mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
     call Gotoxy
-    
+    mov al, ' '
+    call WriteChar
+    ; Update position from path arrays
+    mov eax, DWORD PTR [balls + esi*8 + BallStruct.pathIndex]
+    cmp eax, PATH_LENGTH
+    jge deactivate_ball
+    ; Get new position
+    mov bl, [path_x + eax]
+    mov BYTE PTR [balls + esi*8 + BallStruct.xPos], bl
+    mov bl, [path_y + eax]
+    mov BYTE PTR [balls + esi*8 + BallStruct.yPos], bl
+    ; Set color for the ball
+    mov al, [ball_color + esi]
+    movzx eax, al
+    call SetTextColor
+    ; Draw the ball
+    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
+    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
+    call Gotoxy
     mov al, 'O'
     call WriteChar
-    
-    ; Increment path index
+    ; Increment pathIndex
     inc DWORD PTR [balls + esi*8 + BallStruct.pathIndex]
-    
-    ; Add delay for visible movement
-    mov eax, 5000    
-    call Delay
-    
-    jmp short_jump_next
-
-short_jump_deactivate:
-    jmp deactivate_ball
-
-short_jump_next:
     jmp next_ball
-    
 deactivate_ball:
     mov BYTE PTR [balls + esi*8 + BallStruct.active], 0
-    
-    ; Reset color to dim when ball deactivates
-    mov eax, DIM_COLOR
-    call SetTextColor
-    
-    mov dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
-    mov dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
-    call Gotoxy
-    
-    mov al, 'O'
-    call WriteChar
-    
 next_ball:
     inc esi
-    dec ecx                 ; Decrement counter
-    jnz update_loop        ; Jump if not zero (replace loop instruction)
-    
+    dec ecx
+    jnz update_loop
+    ; Add delay for movement speed control
+    mov eax, 500          ; Increased value for longer delay
+    call Delay
     ret
 UpdateBalls ENDP
+
 
 ; Helper procedure to spawn new balls
 SpawnNewBall PROC
@@ -1601,20 +1562,12 @@ SpawnNewBall ENDP
 
 ; GameLoop Procedure
 GameLoop PROC
-    loop1:
-        ; Update moving balls first
-        call UpdateBalls
-
-        ; Handle player input and movements
-        call MovePlayer
-
-        ; Control game speed - shorter delay for smoother animation
-        ;mov eax, 50000         ; Adjusted delay value
-        ;call Delay
-
-        jmp loop1             ; Repeat the loop
-
-    ret
+game_loop_start:
+    ; Update moving balls
+    call UpdateBalls
+    ; Handle player input and movements
+    call MovePlayer
+    jmp game_loop_start
 GameLoop ENDP
 
 ; Modified InitialiseScreen to include static path
