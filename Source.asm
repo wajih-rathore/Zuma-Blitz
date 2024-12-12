@@ -145,11 +145,8 @@ PlaySound proto, pszsound:ptr byte, hmod:dword, fdwsound:dword
           BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
-          BYTE "|                                              ---                                                     |", 0
-          BYTE "|                                             |   |                                                    |", 0
-          BYTE "|                                             |   |                                                    |", 0
-          BYTE "|                                             |   |                                                    |", 0
-          BYTE "|                                              ---                                                     |", 0
+          BYTE "|                                                                                                      |", 0
+          BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
           BYTE "|                                                                                                      |", 0
@@ -344,7 +341,20 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
     DIM_COLOR    EQU 8   ; Gray color for static path
     ACTIVE_COLOR EQU 10  ; Light Green for moving balls
 
-    ball_color db 245 dup(10)
+    ball_color db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+                db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+
 
     ; Time between ball spawns
     SPAWN_DELAY EQU 50000
@@ -1483,6 +1493,8 @@ UpdateBalls PROC
     mov ecx, MAX_BALLS
     xor esi, esi        ; Ball index
 update_loop:
+    mov eax, 200          ; Increased value for longer delay
+    call Delay
     ; Check if ball is active
     cmp BYTE PTR [balls + esi*8 + BallStruct.active], 1
     jne next_ball
@@ -1521,8 +1533,7 @@ next_ball:
     dec ecx
     jnz update_loop
     ; Add delay for movement speed control
-    mov eax, 500          ; Increased value for longer delay
-    call Delay
+
     ret
 UpdateBalls ENDP
 
@@ -1564,7 +1575,7 @@ SpawnNewBall ENDP
 GameLoop PROC
 game_loop_start:
     ; Update moving balls
-    call UpdateBalls
+call UpdateBalls
     ; Handle player input and movements
     call MovePlayer
     jmp game_loop_start
