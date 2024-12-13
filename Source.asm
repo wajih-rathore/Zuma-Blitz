@@ -229,7 +229,7 @@ sprites_downright BYTE "   ", 0ah, " O ", 0ah, " \\", 0
     current_color db 4
     emitter_color1 db 2
     emitter_color2 db 4
-    fire_color db 14
+    ;fire_color db 14
 
     ; Emitter properties
     emitter_symbol db "#"
@@ -238,7 +238,7 @@ sprites_downright BYTE "   ", 0ah, " O ", 0ah, " \\", 0
 
 ; Fireball properties
     fire_symbol db '*'    ; Symbol to represent the fireball
-    ;fire_color db 14      ; Color code for the fireball (yellow)
+    fire_color db 14      ; Color code for the fireball (yellow)
     fire_col db 0         ; Fireball's current column position
     fire_row db 0         ; Fireball's current row position
 
@@ -343,7 +343,7 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
 
 ball_colors db 4, 4, 4, 4, 4, 4, 14, 1, 5, 4    ; Colors for balls 1-10
             db 2, 14, 1, 5, 4, 2, 14, 1, 5, 4    ; Colors for balls 11-20
-            db 2, 14, 1, 5, 4, 2, 2, 2, 2, 2     ; Colors for balls 21-30
+            db 2, 14, 1, 5, 4, 2, 2, 2, 2, 8     ; Colors for balls 21-30
 
 
 
@@ -351,9 +351,12 @@ ball_colors db 4, 4, 4, 4, 4, 4, 14, 1, 5, 4    ; Colors for balls 1-10
     SPAWN_DELAY EQU 50
     last_spawn_time DWORD 0
     spawn_counter DWORD 0
-
+    game_over_flag db 0
+    pause_flag db 0   ; Flag to track pause state
     GAME_SPEED_DELAY EQU 50
-
+path_counter db PATH_LENGTH DUP(0)  ; Track balls passed through each position
+    screen_buffer db 4000 dup(?) ; Buffer to store screen contents
+    screen_attrs  db 4000 dup(?) ; Buffer to store screen attributes
         ; Array of 30 balls using the updated BallStruct
     balls BallStruct MAX_BALLS DUP (<>)
 
@@ -373,6 +376,20 @@ ball_colors db 4, 4, 4, 4, 4, 4, 14, 1, 5, 4    ; Colors for balls 1-10
 
 @
 
+
+
+;--------------------------------------------------------------------------------
+
+filename db "highscores.txt", 0
+filehandle DWORD ?
+buffer_size = 100
+writebuffer db buffer_size DUP(?)
+
+readbuffer db buffer_size DUP(?)
+scoreStr db "Score: ", 0
+levelStr db " Level: ", 0
+
+tempStr db 16 DUP(0)
 
 .code
 
@@ -524,6 +541,149 @@ askforChoice PROC
 ret
 askforChoice endp
 
+
+GetPlayerName PROC
+    pushad
+    
+    call clrscr
+    
+    ; Display prompt
+    mov edx, OFFSET nameinput
+    call WriteString
+    
+    ; Get username
+    mov edx, OFFSET username
+    mov ecx, 15          ; Max 15 chars
+    call ReadString
+    
+    popad
+    ret
+GetPlayerName ENDP
+
+
+SaveHighScore PROC
+    pushad
+    
+    ; Create/Open file for append
+    mov edx, OFFSET filename
+    call CreateOutputFile
+    mov filehandle, eax
+    
+    ; Check if file opened successfully
+    cmp eax, INVALID_HANDLE_VALUE
+    je save_exit
+    
+    ; Clear buffer
+    mov edi, OFFSET writebuffer
+    mov ecx, buffer_size
+    mov al, 0
+    rep stosb
+    
+    ; Start writing to buffer
+    mov edi, OFFSET writebuffer
+    
+    ; Copy username
+    mov esi, OFFSET username
+copy_name:
+    mov al, [esi]
+    mov [edi], al
+    inc esi
+    inc edi
+    cmp al, 0
+    jne copy_name
+    
+    ; Add separator
+    dec edi                 ; Back up over null
+    mov BYTE PTR [edi], ':'
+    inc edi
+    mov BYTE PTR [edi], ' '
+    inc edi
+    
+    ; Add score directly (single digit)
+    mov al, score
+    add al, '0'            ; Convert to ASCII
+    mov [edi], al
+    inc edi
+    
+    ; Add level info
+    mov BYTE PTR [edi], ' '
+    inc edi
+    mov BYTE PTR [edi], 'L'
+    inc edi
+    mov BYTE PTR [edi], ':'
+    inc edi
+    mov BYTE PTR [edi], ' '
+    inc edi
+    
+    ; Add level number
+    mov al, game_levelInfo
+    add al, '0'            ; Convert to ASCII
+    mov [edi], al
+    inc edi
+    
+    ; Add newline
+    mov BYTE PTR [edi], 0Dh    ; CR
+    inc edi
+    mov BYTE PTR [edi], 0Ah    ; LF
+    inc edi
+    
+    ; Write to file
+    mov edx, OFFSET writebuffer
+    mov ecx, edi
+    sub ecx, OFFSET writebuffer
+    mov eax, filehandle
+    call WriteToFile
+    
+    ; Close file
+    mov eax, filehandle
+    call CloseFile
+    
+save_exit:
+    popad
+    ret
+SaveHighScore ENDP
+
+
+DisplayHighScores PROC
+    pushad
+    
+    call clrscr
+    
+    ; Display title
+    mov edx, OFFSET hsstring
+    call WriteString
+    call Crlf
+    call Crlf
+    
+    ; Open file for reading
+    mov edx, OFFSET filename
+    call OpenInputFile      ; Use Irvine's OpenInputFile
+    mov filehandle, eax
+    
+    ; Read and display scores
+read_loop:
+    mov edx, OFFSET readbuffer
+    mov ecx, buffer_size
+    call ReadFromFile      ; Use Irvine's ReadFromFile
+    jc done_reading        ; If carry flag set, end of file
+    
+    mov edx, OFFSET readbuffer
+    call WriteString       ; Display the scores
+    jmp read_loop
+    
+done_reading:
+    mov eax, filehandle
+    call CloseFile
+    
+    ; Wait for key press
+    mov edx, OFFSET exitstring
+    call WriteString
+    call ReadChar
+    
+    popad
+    ret
+DisplayHighScores ENDP
+
 displayInstructions PROC
     ; Clear screen before displaying instructions
     call clrscr
@@ -592,16 +752,7 @@ askForInput:
 displayInstructions ENDP
 
 
-gameP PROC
-    call clrscr
-    
-    ; Initial position for level selection
-    mov ebx, 1  ; Track current level (1,2,3)
-    
-display_levels:
-    ; Clear screen each time to refresh
-    call clrscr
-    
+DisplayLevels PROC
     ; Display all three levels
     mov dl, 30
     mov dh, 5
@@ -615,7 +766,6 @@ display_levels:
     mov dl, 30
     mov dh, 6
     call gotoxy
-
     mov edx, OFFSET level12
     call writestring
 
@@ -651,7 +801,6 @@ display_levels:
     mov dl, 30
     mov dh, 13
     call gotoxy
-
     mov edx, OFFSET level21
     call writestring
 
@@ -659,7 +808,6 @@ display_levels:
     mov dl, 30
     mov dh, 14
     call gotoxy
-
     mov edx, OFFSET level22
     call writestring
 
@@ -695,7 +843,6 @@ display_levels:
     mov dl, 30
     mov dh, 21
     call gotoxy
-
     mov edx, OFFSET level31
     call writestring
 
@@ -703,7 +850,6 @@ display_levels:
     mov dl, 30
     mov dh, 22
     call gotoxy
-
     mov edx, OFFSET level32
     call writestring
 
@@ -734,72 +880,322 @@ display_levels:
     call gotoxy
     mov edx, OFFSET level36
     call writestring
-    
-    ; -------------------------------------------------------------------------------------------------------
 
-    ; Clear previous cursor position and draw new one
+    ret
+DisplayLevels ENDP
+
+; Update gameP to use new procedure name
+gameP PROC
+    call clrscr
+    
+    ; Initial position for level selection
+    mov ebx, 1  ; Track current level (1,2,3)
+    
+show_levels:
+    call clrscr
+    call DisplayLevels
     mov eax, yellow   
     call SetTextColor
     
-    ; Calculate cursor position based on current level
-    mov dl, 18        ; X position 
-    mov dh, 8         ; Base Y position for level 1
-    
-    cmp ebx, 1
-    je draw_cursor
-    
-    cmp ebx, 2
-    jne check_level3
-    mov dh, 16        ; Y position for level 2
-    jmp draw_cursor
-    
-check_level3:
-    mov dh, 24        ; Y position for level 3
-    
-draw_cursor:
-    call Gotoxy
-    mov al, '>'
-    call WriteChar
-    
-    mov eax, white    
-    call SetTextColor
-    
 get_input:
-    mov eax, 0
-    call ReadKey      
+    call ReadChar
     
-    ; Handle up arrow
-    cmp ax, 4800h     
-    jne try_down
-    cmp ebx, 1        ; At top?
-    je get_input      ; Yes, ignore
-    dec ebx           ; No, move up
-    jmp display_levels
+    ; Handle number keys for level selection
+    cmp al, '1'
+    jne try_2
+    mov ebx, 1        ; Select level 1
+    mov dl, 27        ; X position for cursor (adjusted)
+    mov dh, 8         ; Y position for level 1
+    jmp show_cursor
     
-try_down:
-    cmp ax, 5000h     ; Down arrow?
+try_2:
+    cmp al, '2'
+    jne try_3
+    mov ebx, 2        ; Select level 2
+    mov dl, 27        ; X position for cursor (adjusted)
+    mov dh, 16        ; Y position for level 2
+    jmp show_cursor
+    
+try_3:
+    cmp al, '3'
     jne try_enter
-    cmp ebx, 3        ; At bottom?
-    je get_input      ; Yes, ignore
-    inc ebx           ; No, move down
-    jmp display_levels
+    mov ebx, 3        ; Select level 3
+    mov dl, 27        ; X position for cursor (adjusted)
+    mov dh, 24        ; Y position for level 3
+    jmp show_cursor
     
 try_enter:
-    cmp ax, 1C0Dh     ; Enter?
-    jne get_input
+    cmp al, 13        ; Check for Enter key
+    je select_level
+    jmp get_input     ; If not recognized, keep waiting
     
-    mov temp, bl      ; Store selection
-    ret               
+show_cursor:
+    call clrscr       ; Clear screen
+    call DisplayLevels ; Redisplay levels
+    call Gotoxy
+    mov al, '>'       ; Draw cursor
+    call WriteChar
+    jmp get_input
+    
+select_level:
+    mov temp, bl      ; Store selected level
+    ret
     
 gameP ENDP
 
+; Add pause menu procedure
+PauseScreen PROC
+    ; Save current positions
+    pushad
+
+    ; Display pause menu
+    call clrscr
+    
+    mov eax, green + (black * 16)
+    call settextcolor
+
+    ; Display pause menu title centered
+    mov dl, 30
+    mov dh, 10
+    call gotoxy
+    mov edx, offset pausestring
+    call writestring
+
+    ; Display options
+    mov dl, 30
+    mov dh, 15
+    call gotoxy
+    mov edx, offset pause1    ; "1. RESUME GAME"
+    call writestring
+
+    mov dl, 30
+    mov dh, 17
+    call gotoxy
+    mov edx, offset pause2    ; "2. RESTART GAME"
+    call writestring
+
+    mov dl, 30
+    mov dh, 19
+    call gotoxy
+    mov edx, offset pause3    ; "3. EXIT GAME"
+    call writestring
+
+pause_input_loop:
+    call ReadChar
+    
+    cmp al, '1'
+    je resume_game
+    cmp al, '2'
+    je restart_game
+    cmp al, '3'
+    je exit_game
+    jmp pause_input_loop
+
+resume_game:
+    ; Redraw entire game state in correct order
+    call clrscr
+    call DrawWall            ; Draw level layout first
+    call DrawStaticPath      ; Draw the path
+    
+    ; Redraw all balls in their current positions
+    mov ecx, MAX_BALLS
+    xor esi, esi
+redraw_balls:
+    push ecx
+    mov al, BYTE PTR [balls + esi*8 + Ball_active]
+    cmp al, 1
+    jne skip_ball
+    call DrawBall           ; Draw active balls
+skip_ball:
+    inc esi
+    pop ecx
+    loop redraw_balls
+
+    mov eax, yellow
+    call SetTextColor
+
+    ; Redraw all UI elements
+    call DisplayControls
+    call DisplayHighScore
+    call DisplayTips
+    call DisplayStats
+    call DisplayArt
+    ;call DisplayObjective
+    ;call DisplayProgress
+    call DisplayPlayerName
+    call PrintPlayer       ; Draw player last
+    
+    mov BYTE PTR [pause_flag], 0
+    popad
+    ret
+
+restart_game:
+    popad
+    call InitialiseScreen
+    ret
+
+exit_game:
+    INVOKE ExitProcess, 0
+
+PauseScreen ENDP
+
+
+SaveScreenState PROC
+    pushad
+    
+    ; Save current screen contents and attributes
+    mov edi, OFFSET screen_buffer
+    mov esi, OFFSET screen_attrs
+    mov ecx, 2000  ; 80x25 screen size
+    
+    ; Save character and attribute for each position
+    mov dx, 0      ; Start at (0,0)
+save_loop:
+    push ecx
+    call Gotoxy
+    
+    ; Get character at current position by reading directly
+    call ReadChar  ; Irvine32's ReadChar for non-blocking read
+    mov [edi], al  ; Save character
+    inc edi
+    
+    ; Save current text color as attribute
+    call GetTextColor ; Irvine32's GetTextColor 
+    mov [esi], al  ; Save attribute
+    inc esi
+    
+    inc dl         ; Move to next column
+    cmp dl, 80     ; Check if end of row
+    jne save_continue
+    mov dl, 0      ; Reset column
+    inc dh         ; Move to next row
+    
+save_continue:
+    pop ecx
+    loop save_loop
+    
+    popad
+    ret
+SaveScreenState ENDP
+
+RestoreScreenState PROC
+    pushad
+    
+    ; Restore screen contents and attributes
+    mov esi, OFFSET screen_buffer
+    mov edi, OFFSET screen_attrs
+    mov ecx, 2000  ; 80x25 screen size
+    
+    ; Restore character and attribute for each position
+    mov dx, 0      ; Start at (0,0)
+restore_loop:
+    push ecx
+    call Gotoxy
+    
+    mov al, [esi]  ; Get saved character
+    push eax
+    mov al, [edi]  ; Get saved attribute
+    call SetTextColor
+    pop eax
+    call WriteChar ; Restore character with attribute
+    
+    inc esi
+    inc edi
+    
+    inc dl         ; Move to next column
+    cmp dl, 80     ; Check if end of row
+    jne restore_continue
+    mov dl, 0      ; Reset column
+    inc dh         ; Move to next row
+    
+restore_continue:
+    pop ecx
+    loop restore_loop
+    
+    popad
+    ret
+RestoreScreenState ENDP
+
+CheckBallCollision PROC
+    ; Input: dl = x position, dh = y position
+    ; Output: al = 1 if collision, 0 if no collision
+    ; ebx = index of hit ball
+    pushad                  ; Preserve all registers
+    
+    xor ebx, ebx           ; Ball index = 0
+    mov ecx, MAX_BALLS     ; Check all balls
+    
+check_balls:
+    ; Check if ball is active
+    cmp BYTE PTR [balls + ebx*8 + Ball_active], 1
+    jne next_ball
+    
+    ; Compare positions
+    mov al, BYTE PTR [balls + ebx*8 + Ball_xPos]
+    cmp al, dl
+    jne next_ball
+    mov al, BYTE PTR [balls + ebx*8 + Ball_yPos]
+    cmp al, dh
+    jne next_ball
+    
+    ; Found collision
+    mov [esp + 28], ebx    ; Store ball index for return
+    mov BYTE PTR [esp + 24], 1  ; Set al = 1 for return
+    popad
+    mov al, 1              ; Set collision found
+    ret
+    
+next_ball:
+    inc ebx
+    loop check_balls
+    
+    ; No collision found
+    popad
+    xor al, al            ; Set no collision
+    ret
+CheckBallCollision ENDP
+
+UpdateScore PROC
+    ; Input: al = 1 if ball hit, 0 if just fired
+    push eax
+    
+    ; Update score based on hit type
+    cmp al, 1
+    je ball_hit
+    
+    ; Just fired - add 1 point
+    inc BYTE PTR [score]
+    jmp check_high_score
+    
+ball_hit:
+    ; Hit ball - add 5 points
+    add BYTE PTR [score], 5
+    
+check_high_score:
+    ; Update high score if current score is higher
+    movzx eax, BYTE PTR [score]
+    cmp eax, high_score
+    jle score_updated
+    mov high_score, eax
+    
+score_updated:
+    pop eax
+    ret
+UpdateScore ENDP
+
+
+
 
 FireBall PROC
-    ; Initialize fireball direction based on player's direction
+    ; Increment score once for firing
+    inc BYTE PTR [score]
+    call UpdateScoreDisplay   ; Update score display immediately
 
+    ; Initialize fireball direction based on player's direction
     ; Set initial fireball position based on player's position
     mov dl, xPos     ; Fire column starts at the player's X position
     mov dh, yPos     ; Fire row starts at the player's Y position
+
 
     add dl, 1        
     add dh, 1
@@ -898,6 +1294,10 @@ fire_loop:
     cmp dh, al
     jge end_fire
 
+    ; Increment score for firing
+    ;inc BYTE PTR [score]
+    ;call UpdateScoreDisplay   ; Update score on screen
+
     ; Move cursor to new position
     mov cursor_col, dl
     mov cursor_row, dh
@@ -909,25 +1309,93 @@ fire_loop:
     mov al, fire_symbol
     call WriteChar
 
+    ; Check for collision with balls
+    push edx                ; Save current position
+    ;call CheckBallCollision
+    pop edx                ; Restore position
+    cmp al, 1
+    je handle_hit
+
     ; Delay for animation effect
     mov eax, 10
     call Delay
 
-    ; Erase the fire symbol before moving to the next position
+    ; Erase previous position
     call GoToXY
+    
+    ; Check if current position is on path
+    push edx            
+    call IsPathPosition
+    pop edx             
+    cmp al, 1
+    je redraw_path
+
+    ; Not on path, just print space
     mov al, ' '
+    jmp draw_char
+
+handle_hit:
+    ; Ball hit - update score and deactivate ball
+    mov BYTE PTR [balls + ebx*8 + Ball_active], 0
+    add BYTE PTR [score], 5    ; Add 5 points for hitting ball
+    call UpdateScoreDisplay    ; Update score display
+    jmp end_fire
+
+redraw_path:
+    ; On path, redraw path marker
+    mov eax, DIM_COLOR
+    call SetTextColor
+    mov al, 'O'
+
+draw_char:
     call WriteChar
 
-    ; Update fireball position for next iteration
+    ; Update position
     add dl, xDir
     add dh, yDir
-
-    ; Loop back to continue moving the fireball
     jmp fire_loop
 
 end_fire:
     ret
 FireBall ENDP
+
+; Add new procedure to update score display
+UpdateScoreDisplay PROC
+    pushad
+    
+    ; Save cursor position
+    mov dl, cursor_col
+    mov dh, cursor_row
+    push edx
+    
+    ; Move to score position
+    mov dl, 105
+    mov dh, 2
+    call Gotoxy
+    
+    ; Display "Score: "
+    mWrite "Score: "
+    
+    ; Display score in blue
+    mov eax, Blue + (black * 16)
+    call SetTextColor
+    movzx eax, BYTE PTR [score]
+    call WriteDec
+    
+    ; Restore text color
+    mov eax, white + (black * 16)
+    call SetTextColor
+    
+    ; Restore cursor position
+    pop edx
+    mov cursor_col, dl
+    mov cursor_row, dh
+    call Gotoxy
+    
+    popad
+    ret
+UpdateScoreDisplay ENDP
+
 
 ; Display game controls on the right side
 DisplayControls PROC
@@ -1256,7 +1724,7 @@ MovePlayer PROC
     ; Handle input
     cmp     inputChar, VK_SPACE
     je      shoot
-    cmp     inputChar, VK_ESCAPE
+    cmp     inputChar, 'p'
     je      paused
     cmp     inputChar, 'w'
     je      move_up
@@ -1321,9 +1789,11 @@ shoot:
     jmp     end_move
 
 paused:
-    ; Implement pause functionality
-    ; ...existing code...
-    jmp     end_move
+    ; Immediately show pause screen
+    call clrscr
+    call PauseScreen
+    jmp end_move
+
 
 no_action:
     ; No valid input was pressed
@@ -1480,52 +1950,218 @@ IsPathPosition ENDP
 
 
 
-; EraseBall Procedure
-; EraseBall Procedure
+
+.code
+; Update EraseBall procedure
 EraseBall PROC
-    push    eax
-    push    ebx
-    push    ecx
-    push    edx
-    push    esi
-    push    edi
+    pushad
 
     ; Get current ball position
-    mov     dl, BYTE PTR [balls + esi*8 + Ball_xPos]
-    mov     dh, BYTE PTR [balls + esi*8 + Ball_yPos]
-
+    mov dl, BYTE PTR [balls + esi*8 + Ball_xPos]
+    mov dh, BYTE PTR [balls + esi*8 + Ball_yPos]
+    
     ; Move cursor to ball's position
-    call    Gotoxy
+    call Gotoxy
 
-    ; Check if the current position is on the path
-    call    IsPathPosition
-    cmp     al, 1
-    je      RestorePath
+    ; Get ball's pathIndex
+    mov eax, DWORD PTR [balls + esi*8 + Ball_pathIndex]
+    
+    ; Increment counter for this path position
+    inc BYTE PTR [path_counter + eax]
+    
+    ; Check active balls at this position
+    push esi
+    mov ebx, 0          ; Counter for active balls
+    mov ecx, MAX_BALLS
+count_active:
+    cmp BYTE PTR [balls + ecx*8 + Ball_active], 1
+    jne next_count
+    cmp DWORD PTR [balls + ecx*8 + Ball_pathIndex], eax
+    jne next_count
+    inc ebx             ; Found an active ball at this position
+next_count:
+    loop count_active
+    pop esi
 
-    ; If not on path, erase by writing a space
-    mov     al, ' '
-    mov     ah, 7           ; Default color (white)
-    call    WriteChar
-    jmp     EndErase
+    ; If no active balls remain at this position, use gray
+    cmp ebx, 0
+    je use_gray
+    
+    ; Otherwise get next ball's color
+    push esi
+    call FindNextBallAtPosition
+    pop esi
+    movzx eax, al
+    jmp draw_marker
 
-RestorePath:
-    ; If on path, restore the static path's 'O' with DIM_COLOR
-    mov     al, 'O'
-    mov     ah, DIM_COLOR
-    call    WriteChar
+use_gray:
+    mov eax, DIM_COLOR
 
-EndErase:
-    pop     edi
-    pop     esi
-    pop     edx
-    pop     ecx
-    pop     ebx
-    pop     eax
+draw_marker:
+    call SetTextColor
+    mov al, 'O'
+    call WriteChar
+
+    popad
     ret
 EraseBall ENDP
 
+; New helper procedure to find next ball at current position
+FindNextBallAtPosition PROC
+    push ecx
+    push esi
+    
+    ; Start checking from current ball onwards
+    mov ecx, MAX_BALLS
+    
+    ; Get current pathIndex
+    mov eax, DWORD PTR [balls + esi*8 + Ball_pathIndex]
+    
+search_loop:
+    inc esi
+    cmp esi, MAX_BALLS
+    jb check_ball
+    xor esi, esi        ; Wrap around to start
+    
+check_ball:
+    ; Check if ball is active and at this position
+    cmp BYTE PTR [balls + esi*8 + Ball_active], 1
+    jne next_ball
+    
+    cmp DWORD PTR [balls + esi*8 + Ball_pathIndex], eax
+    jne next_ball
+    
+    ; Found a ball - return its color
+    mov al, BYTE PTR [balls + esi*8 + Ball_color]
+    jmp found_ball
+    
+next_ball:
+    loop search_loop
+    
+    ; No ball found - return gray color
+    mov al, DIM_COLOR
+    
+found_ball:
+    pop esi
+    pop ecx
+    ret
+FindNextBallAtPosition ENDP
 
 
+GameOverScreen PROC
+    pushad                      ; Save all registers
+
+    
+    ; Save score before showing game over screen
+    call SaveHighScore
+
+show_screen:
+    call clrscr                ; Clear the screen
+
+    ; Set green background and white text
+    mov eax, green
+    call settextcolor
+
+    mov dl, 25                 ; X position
+    mov dh, 10                 ; Y position
+    call gotoxy
+
+    ; Display "GAME OVER" ASCII Art
+    mov edx, offset gameover1
+    call writestring
+
+    mov dl, 25
+    mov dh, 11
+    call gotoxy
+    mov edx, offset gameover2
+    call writestring
+
+    mov dl, 25
+    mov dh, 12
+    call gotoxy
+    mov edx, offset gameover3
+    call writestring
+
+    mov dl, 25
+    mov dh, 13
+    call gotoxy
+    mov edx, offset gameover4
+    call writestring
+
+    ; Display options
+    mov dl, 30
+    mov dh, 15
+    call gotoxy
+    mov edx, offset exitstring
+    call writestring
+
+    mov dl, 30
+    mov dh, 17
+    call gotoxy
+    mov edx, offset choiceask  ; "Enter Your Choice:  "
+    call writestring
+
+    ; Display choices
+    mov dl, 30
+    mov dh, 18
+    call gotoxy
+    mwrite <"1.  Go to main menu">
+
+    mov dl, 30
+    mov dh, 20
+    call gotoxy
+    mwrite <"2.  Exit Game">
+
+input_loop:
+    call ReadChar              ; Use ReadChar instead of ReadKey
+    
+    cmp al, '1'
+    je restart_from_menu
+    cmp al, '2'
+    je exit_game
+    jmp input_loop            ; Invalid input, keep waiting
+    
+exit_game:
+    INVOKE ExitProcess, 0
+
+restart_from_menu:
+    ; Reset game state variables
+    mov BYTE PTR [game_over_flag], 0  
+    mov DWORD PTR [spawn_counter], 0
+    mov BYTE PTR [score], 0
+    mov BYTE PTR [lives], 3
+    
+    ; Clear path counter array
+    mov ecx, PATH_LENGTH
+    xor esi, esi
+clear_path_counter:
+    mov BYTE PTR [path_counter + esi], 0
+    inc esi
+    loop clear_path_counter
+
+    ; Clear and reset all balls
+    mov ecx, MAX_BALLS
+    xor esi, esi
+reset_balls:
+    mov BYTE PTR [balls + esi*8 + Ball_active], 0
+    mov DWORD PTR [balls + esi*8 + Ball_pathIndex], 0
+    mov BYTE PTR [balls + esi*8 + Ball_xPos], 0
+    mov BYTE PTR [balls + esi*8 + Ball_yPos], 0
+    inc esi
+    loop reset_balls
+
+    ; Clear screen and reset colors
+    call clrscr
+    mov eax, black + (black * 16)
+    call SetTextColor
+    
+    ; Draw menu and get choice
+    call DrawMenu
+    call askforChoice
+    
+    popad
+    ret
+GameOverScreen ENDP
 ; UpdateBalls Procedure
 
 UpdateBalls PROC
@@ -1553,7 +2189,7 @@ update_loop:
     mov     eax, DWORD PTR [balls + esi * 8 + Ball_pathIndex]
     inc     eax
     cmp     eax, PATH_LENGTH
-    jge     deactivate_ball
+    jge     set_game_over        ; Set game over flag
     mov     DWORD PTR [balls + esi * 8 + Ball_pathIndex], eax
 
     mov     bl, [path_x + eax]
@@ -1568,8 +2204,9 @@ update_loop:
 
     jmp     continue_update
 
-deactivate_ball:
-    mov     BYTE PTR [balls + esi * 8 + Ball_active], 0
+set_game_over:
+    mov     BYTE PTR [game_over_flag], 1 ; Set game over
+    jmp     continue_update
 
 continue_update:
     inc     esi
@@ -1579,6 +2216,9 @@ continue_update:
 next_ball:
     inc     esi
     loop    update_loop
+
+check_all_balls:
+    ; Existing code if any
 
 end_update:
     pop     esi
@@ -1656,38 +2296,60 @@ SpawnNewBall ENDP
 GameLoop PROC
 game_loop_start:
     ; Handle player input and movements
-    call    MovePlayer
+    call MovePlayer
 
     ; Update moving balls
-    call    UpdateBalls
+    call UpdateBalls
 
-    ; Increment spawn counter
-    mov     eax, [spawn_counter]
-    add     eax, 1
-    mov     [spawn_counter], eax
-    cmp     eax, SPAWN_DELAY
-    jl      skip_spawn
-    ; Reset counter
-    mov     [spawn_counter], 0
-    ; Spawn a new ball
-    call    SpawnNewBall
+    ; Check if game over flag is set
+    mov al, [game_over_flag]
+    cmp al, 1
+    je exit_game_loop
+
+    ; Existing spawn logic
+    mov eax, [spawn_counter]
+    add eax, 1
+    mov [spawn_counter], eax
+    cmp eax, SPAWN_DELAY
+    jl skip_spawn
+    
+    mov [spawn_counter], 0
+    call SpawnNewBall
 
 skip_spawn:
+    mov eax, GAME_SPEED_DELAY
+    call Delay
+    jmp game_loop_start
 
-    ; Introduce a short delay to control game speed
-    mov     eax, GAME_SPEED_DELAY
-    call    Delay
 
-    ; Check for game over condition or exit
-    ; [Implement game over checks here]
 
-    ; Repeat the loop
-    jmp     game_loop_start
+exit_game_loop:
+    ret
 GameLoop ENDP
 
 
 ; Modified InitialiseScreen to include static path
 InitialiseScreen PROC
+    ; Reset path counter array first
+    mov ecx, PATH_LENGTH
+    xor esi, esi
+clear_path_counter:
+    mov BYTE PTR [path_counter + esi], 0
+    inc esi
+    loop clear_path_counter
+
+    ; Reset all ball states
+    mov ecx, MAX_BALLS
+    xor esi, esi
+clear_balls:
+    mov BYTE PTR [balls + esi*8 + Ball_active], 0
+    mov DWORD PTR [balls + esi*8 + Ball_pathIndex], 0
+    mov BYTE PTR [balls + esi*8 + Ball_xPos], 0
+    mov BYTE PTR [balls + esi*8 + Ball_yPos], 0
+    inc esi
+    loop clear_balls
+
+
     ; Draw the level layout
     call DrawWall
 
@@ -1722,13 +2384,14 @@ InitialiseScreen ENDP
 ; Main Procedure
 main PROC
 
-comment @
+menu_start:
+
 
     call DrawMenu
     call askforChoice
 
     cmp eax, 1
-    je startgame
+    je new_game
 
     cmp eax, 2
     je instructions
@@ -1740,19 +2403,32 @@ comment @
     je exitGame
 
 showhighscores:
-    ; Code to display highscores
-    ret
+    call DisplayHighScores
+    jmp menu_start
 
 instructions:
     call displayInstructions
     ret
 
-    @
 
-startgame:
-    call InitialiseScreen 
-    ;call InitializeBalls   ; Set up the game screen and balls
-    call GameLoop           ; Start the main game loop
+
+new_game:
+    call GetPlayerName
+    call gameP
+    ;call clrscr                 ; Clear screen before starting
+    call InitialiseScreen      ; Set up fresh game screen
+    call GameLoop             
+
+    mov al, [game_over_flag]
+    cmp al, 1
+    je show_game_over
+    jmp new_game
+
+show_game_over:
+    call GameOverScreen        ; Show game over screen
+    jmp menu_start            ; Return to menu after reset
+
+
     ret
 
 exitGame:
