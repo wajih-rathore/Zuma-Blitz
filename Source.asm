@@ -341,7 +341,7 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
     DIM_COLOR    EQU 8   ; Gray color for static path
     ACTIVE_COLOR EQU 10  ; Light Green for moving balls
 
-    ball_color db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
+    ball_colors db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
                 db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
                 db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
                 db 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5, 4, 2, 14, 1, 5
@@ -360,15 +360,18 @@ path_y  db 9, 8, 7, 6, 5, 4, 3, 3, 3, 3                ; First 10 values
     SPAWN_DELAY EQU 50000
     last_spawn_time DWORD 0
 
+    GAME_SPEED_DELAY EQU 50
+
         ; Array of 30 balls using the updated BallStruct
     balls BallStruct MAX_BALLS DUP (<>)
 
-    ; Field offsets within BallStruct
-    Ball_xPos     EQU 0
-    Ball_yPos     EQU 1
-    Ball_stepIdx  EQU 2
-    Ball_active   EQU 6
-    ;Ball_color    EQU 7
+    ; Define BallStruct field offsets
+    Ball_xPos     EQU 0   ; Offset for xPos within BallStruct
+    Ball_yPos     EQU 1   ; Offset for yPos within BallStruct
+    Ball_pathIndex EQU 2  ; Offset for pathIndex within BallStruct
+    Ball_active   EQU 6   ; Offset for active flag within BallStruct
+    Ball_color    EQU 7   ; Offset for color within BallStruct
+
 
     Comment @
 
@@ -805,7 +808,7 @@ FireBall PROC
     ; Set initial fireball position based on player's position
     mov dl, xPos     ; Fire column starts at the player's X position
     mov dh, yPos     ; Fire row starts at the player's Y position
-    
+
     add dl, 1        
     add dh, 1
 
@@ -885,22 +888,21 @@ start_fire:
     add dl, xDir
     add dh, yDir
 
-
 fire_loop:
     ; Check for wall boundaries
-    mov al, [LEFT_WALL_BOUNDARY]
+    mov al, BYTE PTR [LEFT_WALL_BOUNDARY]
     cmp dl, al
     jle end_fire
 
-    mov al, [RIGHT_WALL_BOUNDARY]
+    mov al, BYTE PTR [RIGHT_WALL_BOUNDARY]
     cmp dl, al
     jge end_fire
 
-    mov al, [UPPER_WALL_BOUNDARY]
+    mov al, BYTE PTR [UPPER_WALL_BOUNDARY]
     cmp dh, al
     jle end_fire
 
-    mov al, [LOWER_WALL_BOUNDARY]
+    mov al, BYTE PTR [LOWER_WALL_BOUNDARY]
     cmp dh, al
     jge end_fire
 
@@ -1283,43 +1285,43 @@ MovePlayer PROC
     jmp     no_action        ; No valid input
 
 move_up:
-    ; Implement move up logic
-    ; ...
+    mov     direction, 'w'
+    call    PrintPlayer
     jmp     end_move
 
 move_left:
-    ; Implement move left logic
-    ; ...
+    mov     direction, 'a'
+    call    PrintPlayer
     jmp     end_move
 
 move_down:
-    ; Implement move down logic
-    ; ...
+    mov     direction, 'x'
+    call    PrintPlayer
     jmp     end_move
 
 move_right:
-    ; Implement move right logic
-    ; ...
+    mov     direction, 'd'
+    call    PrintPlayer
     jmp     end_move
 
 rotate_left:
-    ; Implement rotate left logic
-    ; ...
+    mov     direction, 'q'
+    call    PrintPlayer
     jmp     end_move
 
 rotate_right:
-    ; Implement rotate right logic
-    ; ...
+    mov     direction, 'e'
+    call    PrintPlayer
     jmp     end_move
 
 rotate_down_left:
-    ; Implement rotate down-left logic
-    ; ...
+    mov     direction, 'z'
+    call    PrintPlayer
     jmp     end_move
 
 rotate_down_right:
-    ; Implement rotate down-right logic
-    ; ...
+    mov     direction, 'c'
+    call    PrintPlayer
     jmp     end_move
 
 shoot:
@@ -1328,7 +1330,7 @@ shoot:
 
 paused:
     ; Implement pause functionality
-    ; ...
+    ; ...existing code...
     jmp     end_move
 
 no_action:
@@ -1343,6 +1345,7 @@ end_move:
     pop     eax
     ret
 MovePlayer ENDP
+
 
 
 ; Draw the static path
@@ -1381,29 +1384,33 @@ draw_path_loop:
 DrawStaticPath ENDP
 
 ; InitializeBalls Procedure 
+; InitializeBalls Procedure 
 InitializeBalls PROC
-    mov ecx, MAX_BALLS
-    xor esi, esi        ; Ball index
+    mov     ecx, MAX_BALLS
+    xor     esi, esi        ; Ball index = 0
+
 init_loop:
     ; Initialize pathIndex for each ball
-    mov DWORD PTR [balls + esi*8 + BallStruct.pathIndex], esi
-    ; Activate all balls
-    mov BYTE PTR [balls + esi*8 + BallStruct.active], 1
-    ; Set the color for each ball (use a pattern or randomize)
-    ; For simplicity, alternate colors between 12 and 14
-    mov eax, esi
-    and al, 1
-    cmp al, 0
-    jne set_color_14
-    mov BYTE PTR [ball_color + esi], 12   ; Light Red
-    jmp next_init
-set_color_14:
-    mov BYTE PTR [ball_color + esi], 14   ; Yellow
+    mov     DWORD PTR [balls + esi * 8 + Ball_pathIndex], esi
+    ; Activate the ball
+    mov     BYTE PTR [balls + esi * 8 + Ball_active], 1
+    ; Set the color for each ball from ball_colors array
+    mov     al, [ball_colors + esi]
+    and     al, 1
+    cmp     al, 0
+    je      set_color_12
+    mov     BYTE PTR [balls + esi * 8 + Ball_color], 14   ; Yellow
+    jmp     next_init
+
+set_color_12:
+    mov     BYTE PTR [balls + esi * 8 + Ball_color], 12   ; Light Red
+
 next_init:
-    inc esi
-    loop init_loop
+    inc     esi
+    loop    init_loop
     ret
 InitializeBalls ENDP
+
 
 
 ; DrawBall Procedure
@@ -1485,8 +1492,8 @@ EraseBall PROC
     push    edi
 
     ; Get current fireball position
-    mov     dl, BYTE PTR [balls + esi*8 + BallStruct.xPos]
-    mov     dh, BYTE PTR [balls + esi*8 + BallStruct.yPos]
+    mov     dl, BYTE PTR [balls + esi*8 + Ball_xPos]
+    mov     dh, BYTE PTR [balls + esi*8 + Ball_yPos]
 
     ; Check if the current position is on the path
     call    IsPathPosition
@@ -1518,6 +1525,7 @@ EraseBall ENDP
 
 
 ; UpdateBalls Procedure
+
 UpdateBalls PROC
     push    eax
     push    ebx
@@ -1530,7 +1538,7 @@ UpdateBalls PROC
 
 update_loop:
     ; Check if the current ball is active
-    mov     al, [ball_active + esi]
+    mov     al, BYTE PTR [balls + esi * 8 + Ball_active]
     cmp     al, 1
     jne     next_ball           ; Skip inactive balls
 
@@ -1540,18 +1548,18 @@ update_loop:
     pop     esi
 
     ; Update pathIndex and positions
-    mov     eax, [ball_pathIndex + esi*4]
+    mov     eax, DWORD PTR [balls + esi * 8 + Ball_pathIndex]
     inc     eax
     cmp     eax, PATH_LENGTH
     jge     deactivate_ball
-    mov     [ball_pathIndex + esi*4], eax
+    mov     DWORD PTR [balls + esi * 8 + Ball_pathIndex], eax
 
     mov     bl, [path_x + eax]
-    mov     [ball_x + esi], bl
+    mov     BYTE PTR [balls + esi * 8 + Ball_xPos], bl
     mov     bl, [path_y + eax]
-    mov     [ball_y + esi], bl
+    mov     BYTE PTR [balls + esi * 8 + Ball_yPos], bl
 
-    ; Draw the ball with color from 'ball_colors'
+    ; Draw the ball with color from 'ball_color'
     push    esi
     call    DrawBall
     pop     esi
@@ -1559,7 +1567,7 @@ update_loop:
     jmp     continue_update
 
 deactivate_ball:
-    mov     [ball_active + esi], 0
+    mov     BYTE PTR [balls + esi * 8 + Ball_active], 0
 
 continue_update:
     inc     esi
@@ -1616,23 +1624,26 @@ SpawnNewBall ENDP
 GameLoop PROC
 game_loop_start:
     ; Handle player input and movements
-    call MovePlayer
+    call    MovePlayer
 
     ; Update moving balls
-    call UpdateBalls
+    call    UpdateBalls
 
-    ; Optionally spawn new balls
-    call CheckAndSpawnBalls
+    ; Spawn new balls if needed
+    ;call    CheckAndSpawnBalls
 
     ; Update game state
-    call UpdateGameState
+    ;call    UpdateGameState
 
-    ; Render frame (if applicable)
-    call RenderFrame
+    ; Render the frame
+    ;call    RenderFrame
 
     ; Introduce a short delay to control game speed
     mov     eax, GAME_SPEED_DELAY
     call    Delay
+
+    ; Check for game over condition or exit
+    ; [Implement game over checks here]
 
     ; Repeat the loop
     jmp     game_loop_start
