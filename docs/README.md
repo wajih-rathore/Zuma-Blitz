@@ -2,6 +2,13 @@
 
 This project is a 32-bit assembly language game, "Zuma-Blitz," built using the Microsoft Macro Assembler (MASM) and Kip Irvine's Irvine32 library. It's a console-based game inspired by Zuma and features like shooting, omni-directional movement, ball spawning, unique path for each level, game-state management, leaderboard were implemented.
 
+## Video Demo
+
+[![Youtube Video of the Zuma-BLitz game](/assets/poster.png)](https://www.youtube.com/watch?v=UXCIC-iRb_A)
+
+Click anywhere on the image to watch youtube video
+
+
 ## Project Directory Structure
 
 The project is organized into the following directories:
