@@ -1,20 +1,20 @@
 # Zuma-Blitz MASM Assembly Project (Irvine32)
 
-This project is a 32-bit assembly language game, "Zuma-Blitz," built using the Microsoft Macro Assembler (MASM) and Kip Irvine's Irvine32 library. It's a console-based game inspired by Zuma, involving ball shooting mechanics, path-following balls, color matching, and scoring. The project is configured to work with the included Irvine32 library.
+This project is a 32-bit assembly language game, "Zuma-Blitz," built using the Microsoft Macro Assembler (MASM) and Kip Irvine's Irvine32 library. It's a console-based game inspired by Zuma and features like shooting, omni-directional movement, ball spawning, unique path for each level, game-state management, leaderboard were implemented.
 
 ## Project Directory Structure
 
 The project is organized into the following directories:
 
-- **src/** - Contains the source code files (`.asm` files)
-- **assets/** - Game assets such as audio files
-- **docs/** - Documentation (including this README)
-- **lib/** - External libraries, including the Irvine32 library
-- **build/** - Build outputs for different configurations
+- **src/** - contains the source code file (`.asm` file)
+- **assets/** - Game assets such as audio file
+- **docs/** - Documentation
+- **lib/** - the Irvine32 library
+- **build/** - Build outputs
 
 ## Prerequisites
 
-- **Visual Studio 2022** (Community, Professional, or Enterprise) with:
+- **Visual Studio 2022** with:
   - **Desktop development with C++** workload installed, including the MASM component.
 - **Irvine32 Library** (included in the repository):
   - The Irvine32 library files (`Irvine32.lib`, `Irvine32.inc`, etc.) are included in the `lib\Irvine32\irvine\examples\Lib32` directory.
@@ -26,7 +26,7 @@ The project is organized into the following directories:
 
 1. **Clone the Repository**:
    ```bash
-   git clone <your-repository-url>
+   git clone https://github.com/wajih-rathore/Zuma-Blitz
    cd Zuma-Blitz
    ```
 
@@ -103,21 +103,26 @@ The project is organized into the following directories:
 
 ## Additional Notes
 
-- **Directory Structure**: The project follows a clean organization with source files in `src/`, libraries in `lib/`, assets in `assets/`, documentation in `docs/`, and build outputs in `build/`.
 - **32-bit Only**: Irvine32 is incompatible with x64; always use the x86 platform.
-- **Debugging**: Use Visual Studio's debugger with breakpoints and check the `.lst` file for assembly listing.
+- **Debugging**: Use Visual Studio's debugger with breakpoints for any debugging
 - **Tasks**: Implemented in `.asm` files in the `src/` directory. Refer to source files for details.
 - **MASM Documentation**: See the [MASM32 website](http://www.masm32.com/) or Kip Irvine's documentation for more information.
 
 ## Recommended Resources
 
-- **Official Irvine Documentation**: Visit [Kip Irvine's Assembly Language website](http://www.kipirvine.com/asm/) for comprehensive documentation, examples, and resources for the Irvine32 library.
+- **Official Irvine Documentation**: [Kip Irvine's Assembly Language website](https://asmirvine.com/) 
+
+- Personally I recommend using [CSUDH's Irvine Docuementation](https://csc.csudh.edu/mmccullough/asm/help/). It was very helpful.
 
 - **Recommended VS Code Extensions**:
   - [MASM](https://marketplace.visualstudio.com/items?itemName=blindtiger.masm) - Microsoft Macro Assembler language support
   - [MASM/TASM](https://marketplace.visualstudio.com/items?itemName=xsro.masm-tasm) - Provides support for running MASM/TASM in DOSBox
   - [x86 and x86_64 Assembly](https://marketplace.visualstudio.com/items?itemName=13xforever.language-x86-64-assembly) - Syntax highlighting for x86 assembly
   - [ASM Code Lens](https://marketplace.visualstudio.com/items?itemName=maziac.asm-code-lens) - Provides code lens, references, and hover information
+
+  and my favourite: 
+
+  -[AsmDude2](https://marketplace.visualstudio.com/items?itemName=Henk-JanLebbink.AsmDude2) for syntax highlighting
 
 ## Implemented Features
 
